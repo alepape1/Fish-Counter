@@ -1,4 +1,5 @@
 import cv2
+import time
 import numpy as np
 import os
 import tkinter as tk
@@ -9,10 +10,12 @@ fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
 max_detect = 0
 
+def seconds_to_minutes_and_seconds(seconds):
+    minutes, seconds = divmod(seconds, 60)
+    return int(minutes), int(seconds)
 
 def detect_motion(frame, detected_fish, fish_count):
 
-    frame = cv2.resize(frame, (360, 240))
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
     cv2.rectangle(frame, (0, 0), (frame.shape[1], 40), (0, 0, 0), -1)
@@ -53,26 +56,24 @@ def detect_motion(frame, detected_fish, fish_count):
 
     return fish_count
 
-# def write_file_txt(start_times,end_times):
-#     # Guarda los momentos en un archivo de texto
-#     with open("momentos_pesca.txt", "w") as file:
-#         for i in range(len(start_times)):
-#             file.write(f"Pez {i + 1}: {start_times[i]}s - {end_times[i]}s\n")
+def write_file_txt(output_folder, video_file_name, start_times, end_times):
+    
+    if not os.path.exists(output_folder):
+        os.makedirs(output_folder)  # Crea la carpeta de salida si no existe
 
-#     # Si quedó un pez sin finalizar, regístralo
-#     if len(start_times) > len(end_times):
-#         file.write(f"Pez {len(start_times) + 1}: {start_times[-1]}s - {cap.get(cv2.CAP_PROP_POS_MSEC) / 1000}s\n")
-
-def write_file_txt(video_file_name, start_times, end_times):
-    file_name = f"{video_file_name}_momentos_pesca.txt"
+    file_name = os.path.join(output_folder, f"{video_file_name}_momentos_pesca.txt")
 
     with open(file_name, "w") as file:
         for i in range(len(start_times)):
-            file.write(f"Pez {i + 1}: {start_times[i]}s - {end_times[i]}s\n")
+            start_minutes, start_seconds = seconds_to_minutes_and_seconds(start_times[i])
+            end_minutes, end_seconds = seconds_to_minutes_and_seconds(end_times[i])
 
-    # If there's a fish detected but not finished, record it
-    if len(start_times) > len(end_times):
-        file.write(f"Pez {len(start_times) + 1}: {start_times[-1]}s - {end_times[-1]}s\n")
+            file.write(f"Pez {i + 1}: {start_minutes:02d}m {start_seconds:02d}s - {end_minutes:02d}m {end_seconds:02d}s\n")
+
+        # Si hay un pez detectado pero no finalizado, regístralo
+        if len(start_times) > len(end_times):
+            last_start_minutes, last_start_seconds = seconds_to_minutes_and_seconds(start_times[-1])
+            file.write(f"Pez {len(start_times) + 1}: {last_start_minutes:02d}m {last_start_seconds:02d}s - {end_minutes:02d}m {end_seconds:02d}s\n")
 
 # Function to process a single video
 def process_video(video_path):
@@ -111,7 +112,7 @@ def process_video(video_path):
 
     # Close the text file
 
-    write_file_txt(video_file_name, start_times, end_times)
+    write_file_txt("output",video_file_name, start_times, end_times)
     cap.release()
 
 # Function to process all videos in a folder
@@ -131,63 +132,13 @@ def select_folder():
     return folder_path
 
 if __name__ == "__main__":
-    
     folder_path = select_folder()
 
     if not os.path.exists(folder_path):
         print("Folder does not exist.")
     else:
+        start_time = time.time()  # Registra el tiempo de inicio
         process_videos_in_folder(folder_path)
-
-
-# filePath = r"video_files\test5.mp4"
-# print("Versión de OpenCV instalada:", cv2.__version__)
-# cap = cv2.VideoCapture(filePath)
-# # Extract the video file name without the extension
-# # video_file_name = "pez1.mp4"  # Replace with the actual video file name
-# # video_file_name_without_extension = video_file_name.split('.')[0]
-
-# fgbg = cv2.bgsegm.createBackgroundSubtractorMOG()
-# kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-# max_detect = 0
-
-# fish_count = 0
-# start_time = None
-
-# detected_fish = []  # Lista para realizar un seguimiento de los peces detectados
-
-# start_times = []  # Lista para almacenar los tiempos de inicio
-# end_times = []    # Lista para almacenar los tiempos de finalización
-
-# # Flag to indicate whether a fish has been detected
-# fish_detected = False
-
-# while True:
-#     ret, frame = cap.read()
-#     if ret == False:
-#         break
-
-#     fish_counter = detect_motion(frame, detected_fish, fish_count)
-
-#     # Check if a fish is currently detected
-#     if fish_counter > 0 and start_time is None:
-#         # Fish detected, but no start time recorded yet
-#         start_time = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
-#         print(start_time)
-#     elif fish_counter == 0 and start_time is not None:
-#         # Fish is no longer detected, record end time
-#         end_time = cap.get(cv2.CAP_PROP_POS_MSEC) / 1000
-#         start_times.append(start_time)
-#         end_times.append(end_time)
-#         start_time = None  # Reset start time
-
-
-#     k = cv2.waitKey(70) & 0xFF
-#     if k == 27:
-#         write_file_txt(start_times,end_times)
-#         break
-
-
-# write_file_txt(start_times,end_times)
-# cap.release()
-# cv2.destroyAllWindows()
+        end_time = time.time()
+        elapsed_time = end_time - start_time
+        print(f"Tiempo total de procesamiento: {elapsed_time:.2f} segundos")
