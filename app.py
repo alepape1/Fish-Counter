@@ -1,3 +1,5 @@
+from concurrent.futures import ProcessPoolExecutor
+import sys
 import cv2
 import time
 import numpy as np
@@ -49,8 +51,8 @@ def detect_motion(frame, detected_fish, fish_count):
                 cv2.FONT_HERSHEY_SIMPLEX, 0.8, color,2)
     cv2.putText(frame, "Peces detectados: " + str(fish_count), (10, 60),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255),1)
-    cv2.imshow('fgmask', fgmask)
-    cv2.imshow("frame", frame)
+    # cv2.imshow('fgmask', fgmask)
+    # cv2.imshow("frame", frame)
 
     # Resto del código de procesamiento (sin el bucle while)
 
@@ -61,7 +63,7 @@ def write_file_txt(output_folder, video_file_name, start_times, end_times):
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)  # Crea la carpeta de salida si no existe
 
-    file_name = os.path.join(output_folder, f"{video_file_name}_momentos_pesca.txt")
+    file_name = os.path.join(output_folder, f"{video_file_name}_detected.txt")
 
     with open(file_name, "w") as file:
         for i in range(len(start_times)):
@@ -77,6 +79,7 @@ def write_file_txt(output_folder, video_file_name, start_times, end_times):
 
 # Function to process a single video
 def process_video(video_path):
+
     cap = cv2.VideoCapture(video_path)
  
     # Get the video file name without the extension
@@ -116,13 +119,20 @@ def process_video(video_path):
     cap.release()
 
 # Function to process all videos in a folder
+# def process_videos_in_folder(folder_path):
+#     video_files = [f for f in os.listdir(folder_path) if f.endswith('.mp4') or f.endswith('.MOV') or f.endswith('.avi')]
+
+#     for video_file in video_files:
+#         video_path = os.path.join(folder_path, video_file)
+#         print(f"Processing video: {video_path}")
+#         process_video(video_path)
+
 def process_videos_in_folder(folder_path):
     video_files = [f for f in os.listdir(folder_path) if f.endswith('.mp4') or f.endswith('.MOV') or f.endswith('.avi')]
 
-    for video_file in video_files:
-        video_path = os.path.join(folder_path, video_file)
-        print(f"Processing video: {video_path}")
-        process_video(video_path)
+    with ProcessPoolExecutor() as executor:
+        executor.map(process_video, [os.path.join(folder_path, video_file) for video_file in video_files])
+
 
 def select_folder():
     root = tk.Tk()
@@ -131,14 +141,40 @@ def select_folder():
     folder_path = filedialog.askdirectory()
     return folder_path
 
+# if __name__ == "__main__":
+
+#     folder_path = select_folder()
+
+#     if not os.path.exists(folder_path):
+#         print("Folder does not exist.")
+#     else:
+#         start_time = time.time()  # Registra el tiempo de inicio
+#         process_videos_in_folder(folder_path)
+#         end_time = time.time()
+#         elapsed_time = end_time - start_time
+#         print(f"Tiempo total de procesamiento: {elapsed_time:.2f} segundos")
+
 if __name__ == "__main__":
-    folder_path = select_folder()
+
+    if len(sys.argv) != 2:
+        print("Usage: python script_name.py /path/to/folder")
+        sys.exit(1)
+
+    folder_path = sys.argv[1]
 
     if not os.path.exists(folder_path):
         print("Folder does not exist.")
-    else:
-        start_time = time.time()  # Registra el tiempo de inicio
+        sys.exit(1)
+
+    if "tkinter" in sys.modules:
+        print("Interfaz gráfica disponible.")
         process_videos_in_folder(folder_path)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
-        print(f"Tiempo total de procesamiento: {elapsed_time:.2f} segundos")
+    else:
+        print("Interfaz gráfica no disponible. Ejecutando en modo sin interfaz.")
+    
+    start_time = time.time()  # Registra el tiempo de inicio
+    process_videos_in_folder(folder_path)
+    end_time = time.time()
+    elapsed_time = end_time - start_time
+    print(f"Tiempo total de procesamiento: {elapsed_time:.2f} segundos")
+
